@@ -1,0 +1,68 @@
+ANÁLISIS DE CAPACIDADES DE LA API (PYTHON / FASTAPI)
+=====================================================
+
+1. INFORMACIÓN GENERAL
+----------------------
+- Framework: FastAPI (Python).
+- Propósito: Motor numérico para resolver Ecuaciones Diferenciales Ordinarias (EDO) de primer orden.
+- Métodos Numéricos Implementados:
+  - Euler (Orden 1).
+  - Runge-Kutta 4 (RK4) (Orden 4).
+
+2. ENDPOINTS DISPONIBLES
+------------------------
+La API expone los siguientes endpoints REST:
+
+A. METADATA
+   - GET /methods
+     Devuelve la lista de métodos numéricos disponibles con su orden de convergencia.
+     Ejemplo: Euler (orden 1), RK4 (orden 4).
+
+   - GET /examples
+     Devuelve un catálogo de problemas de ejemplo predefinidos (ej. Crecimiento Exponencial).
+     Útil para pruebas rápidas y validación contra soluciones analíticas conocidas.
+
+B. SOLVER
+   - POST /solve
+     Es el núcleo de la API. Recibe la definición del problema y devuelve la solución numérica.
+
+3. CAPACIDADES DEL SOLVER (POST /solve)
+---------------------------------------
+
+A. TIPOS DE ECUACIONES
+   1. Predefinidas ("predefined"):
+      - Se seleccionan por ID (ej. "exp_growth").
+      - Tienen solución analítica incorporada en el backend para comparación exacta.
+      - Permiten ajustar parámetros (ej. "lambda" en crecimiento exponencial).
+
+   2. Personalizadas ("custom"):
+      - El usuario envía la expresión matemática como texto (ej. "x*y - 2*x").
+      - El backend utiliza la librería 'SymPy' para interpretar y evaluar la ecuación dinámicamente.
+      - Soporta variables "x" e "y".
+
+B. PARÁMETROS DE ENTRADA
+   - Condición Inicial: Valores (x0, y0).
+   - Dominio: Valor final de x (x_end). El solver avanza desde x0 hasta x_end.
+   - Paso (h): Tamaño del paso de integración (step size).
+   - Métodos: Lista de métodos a ejecutar simultáneamente (ej. ["Euler", "RK4"]).
+   - Modo de Comparación:
+     - "solo_numeric": Solo devuelve los puntos calculados.
+     - "contra_analitica": Compara los resultados numéricos contra la solución exacta (solo para ecuaciones predefinidas).
+     - "entre_metodos": Compara los resultados de dos métodos numéricos entre sí (útil para estimar error cuando no hay solución analítica).
+
+C. SALIDA Y RESULTADOS
+   - Resumen del Problema: Datos de entrada confirmados.
+   - Resultados por Método:
+     - Lista de puntos (x, y).
+     - Metadatos: Tiempo de cómputo (ms), número de pasos, orden del método.
+   - Solución Analítica (Opcional): Puntos exactos para referencia.
+   - Métricas de Error:
+     - RMSE (Raíz del Error Cuadrático Medio).
+     - Error Máximo.
+     - Identificación automática del "mejor método" basado en la precisión.
+
+4. DETALLES TÉCNICOS
+--------------------
+- Parsing de Ecuaciones: Utiliza `sympy.sympify` y `lambdify` para convertir strings en funciones ejecutables de Python.
+- Validación: Verifica que el dominio sea válido (x_end > x0) y que los métodos solicitados existan.
+- Rendimiento: Mide el tiempo de ejecución de cada método para comparativas de eficiencia.
