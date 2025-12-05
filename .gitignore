@@ -1,0 +1,95 @@
+# ----------------------------------------
+# Python
+# ----------------------------------------
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pdb
+*.so
+*.egg
+*.egg-info/
+.eggs/
+
+# Archivos generados
+*.log
+*.tmp
+*.out
+
+# Entornos virtuales
+venv/
+.env/
+.env.bak/
+.venv/
+env/
+ENV/
+
+# Paquetes y dependencias locales
+pip-wheel-metadata/
+wheelhouse/
+*.whl
+
+# Configuración de herramientas
+.mypy_cache/
+.pytest_cache/
+.cache/
+coverage.xml
+htmlcov/
+.coverage
+.coverage.*
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Build
+build/
+dist/
+develop-eggs/
+.installed.cfg
+MANIFEST
+
+# Directorios de tests (si los agregas)
+tests/__pycache__/
+
+# ----------------------------------------
+# Sistemas operativos
+# ----------------------------------------
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+*~
+
+# ----------------------------------------
+# IDEs / Editores
+# ----------------------------------------
+# VSCode
+.vscode/
+
+# PyCharm
+.idea/
+*.iml
+
+# Spyder
+.spyproject/
+
+# Sublime
+*.sublime-project
+*.sublime-workspace
+
+# ----------------------------------------
+# Otros
+# ----------------------------------------
+# Variables de entorno
+*.env
+
+# Datos temporales o de ejecución
+tmp/
+data/
