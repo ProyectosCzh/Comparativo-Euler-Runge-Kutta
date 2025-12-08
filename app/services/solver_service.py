@@ -1,12 +1,21 @@
 from typing import Any
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any
 import time
 
 from fastapi import HTTPException
 
 from app.schemas.ode_schemas import (
-    SolveRequest,
-    SolveResponse,
+    EquationInput,
+    InitialCondition,
+    Domain,
+    EulerRequest,
+    EulerResponse,
+    RK4Request,
+    RK4Response,
+    AnalyticRequest,
+    AnalyticResponse,
+    CompareRequest,
+    CompareResponse,
     MethodResultPoint,
     MethodMetadata,
     MethodResult,
@@ -21,37 +30,212 @@ from app.domain.numerics.rk4 import rk4_solve
 from app.services.comparison_service import compute_pointwise_errors
 
 
-def solve_and_compare(req: SolveRequest) -> SolveResponse:
+# ============================================================
+#  HELPERS COMUNES
+# ============================================================
+
+def _validate_domain(x0: float, x_end: float):
+    if x_end <= x0:
+        raise HTTPException(status_code=400, detail="x_end debe ser mayor que x0")
+
+
+def _prepare_equation(
+    equation: EquationInput,
+    ic: InitialCondition,
+    allow_analytic_for_custom: bool = False,
+):
+    """
+    Devuelve:
+    - f(x,y) numérica
+    - analytic_fn(x) o None
+    - analytic_expr_str o None
+    """
+    f = None
+    analytic_fn = None
+    analytic_expr_str = None
+
+    if equation.type == "predefined":
+        f, analytic_fn, analytic_expr_str = get_predefined_f_and_analytic(equation, ic)
+    else:
+        f = build_custom_f(equation)
+        if allow_analytic_for_custom:
+            # Para el futuro, si quisieras intentar analítica sobre custom.
+            pass
+
+    return f, analytic_fn, analytic_expr_str
+
+
+def _build_problem_summary(
+    equation: EquationInput,
+    ic: InitialCondition,
+    domain: Domain,
+    step: float,
+    num_points: int,
+) -> ProblemSummary:
+    return ProblemSummary(
+        equation_type=equation.type,
+        equation_id=equation.id,
+        expression=equation.expression,
+        x0=ic.x0,
+        y0=ic.y0,
+        x_end=domain.x_end,
+        step=step,
+        num_points=num_points,
+    )
+
+
+def _build_grid(x0: float, x_end: float, h: float) -> List[float]:
+    if h <= 0:
+        raise HTTPException(status_code=400, detail="El paso h debe ser > 0")
+    n_steps_real = (x_end - x0) / h
+    n_steps = int(round(n_steps_real))
+    if n_steps <= 0:
+        raise HTTPException(status_code=400, detail="x_end debe ser mayor que x0 y consistente con h")
+    return [x0 + i * h for i in range(n_steps + 1)]
+
+
+# ============================================================
+#  A) EULER
+# ============================================================
+
+def solve_euler(req: EulerRequest) -> EulerResponse:
     x0 = req.initial_condition.x0
     y0 = req.initial_condition.y0
     x_end = req.domain.x_end
     h = req.step
 
-    if x_end <= x0:
-        raise HTTPException(status_code=400, detail="x_end debe ser mayor que x0")
+    _validate_domain(x0, x_end)
 
-    f = None
-    analytic_fn = None
-    analytic_expr_str = None
+    f, _, _ = _prepare_equation(req.equation, req.initial_condition)
 
-    if req.equation.type == "predefined":
-        try:
-            f, analytic_fn, analytic_expr_str = get_predefined_f_and_analytic(
-                req.equation, req.initial_condition
-            )
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
-    else:
-        try:
-            f = build_custom_f(req.equation)
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
+    start = time.perf_counter()
+    xs, ys = euler_solve(f, x0, y0, h, x_end)
+    end = time.perf_counter()
 
-        if req.comparison_mode == "contra_analitica":
-            raise HTTPException(
-                status_code=400,
-                detail="comparison_mode='contra_analitica' solo está soportado para ecuaciones predefinidas por ahora.",
-            )
+    points = [MethodResultPoint(x=x, y=y) for x, y in zip(xs, ys)]
+    metadata = MethodMetadata(
+        order=1,
+        num_steps=len(xs) - 1,
+        compute_time_ms=(end - start) * 1000.0,
+    )
+
+    summary = _build_problem_summary(
+        req.equation, req.initial_condition, req.domain, req.step, len(points)
+    )
+
+    return EulerResponse(
+        method="Euler",
+        points=points,
+        metadata=metadata,
+        problem_summary=summary,
+    )
+
+
+# ============================================================
+#  B) RK4
+# ============================================================
+
+def solve_rk4(req: RK4Request) -> RK4Response:
+    x0 = req.initial_condition.x0
+    y0 = req.initial_condition.y0
+    x_end = req.domain.x_end
+    h = req.step
+
+    _validate_domain(x0, x_end)
+
+    f, _, _ = _prepare_equation(req.equation, req.initial_condition)
+
+    start = time.perf_counter()
+    xs, ys = rk4_solve(f, x0, y0, h, x_end)
+    end = time.perf_counter()
+
+    points = [MethodResultPoint(x=x, y=y) for x, y in zip(xs, ys)]
+    metadata = MethodMetadata(
+        order=4,
+        num_steps=len(xs) - 1,
+        compute_time_ms=(end - start) * 1000.0,
+    )
+
+    summary = _build_problem_summary(
+        req.equation, req.initial_condition, req.domain, req.step, len(points)
+    )
+
+    return RK4Response(
+        method="RK4",
+        points=points,
+        metadata=metadata,
+        problem_summary=summary,
+    )
+
+
+# ============================================================
+#  C) ANALÍTICA
+# ============================================================
+
+def solve_analytic(req: AnalyticRequest) -> AnalyticResponse:
+    x0 = req.initial_condition.x0
+    x_end = req.domain.x_end
+    h = req.step
+
+    _validate_domain(x0, x_end)
+
+    if req.equation.type != "predefined":
+        raise HTTPException(
+            status_code=400,
+            detail="El endpoint /solve/analytic solo admite ecuaciones predefinidas.",
+        )
+
+    _, analytic_fn, analytic_expr_str = _prepare_equation(
+        req.equation, req.initial_condition
+    )
+
+    if analytic_fn is None:
+        raise HTTPException(
+            status_code=400,
+            detail="No se dispone de solución analítica para esta ecuación.",
+        )
+
+    xs = _build_grid(x0, x_end, h)
+    ys = [analytic_fn(x) for x in xs]
+
+    analytic_points = [AnalyticPoint(x=x, y=y) for x, y in zip(xs, ys)]
+    solution = AnalyticSolution(
+        expression=analytic_expr_str or "",
+        points=analytic_points,
+    )
+
+    summary = _build_problem_summary(
+        req.equation, req.initial_condition, req.domain, req.step, len(xs)
+    )
+
+    return AnalyticResponse(
+        solution=solution,
+        problem_summary=summary,
+    )
+
+
+# ============================================================
+#  D) COMPARADOR (BENCHMARK)
+# ============================================================
+
+def solve_benchmark(req: CompareRequest) -> CompareResponse:
+    x0 = req.initial_condition.x0
+    y0 = req.initial_condition.y0
+    x_end = req.domain.x_end
+    h = req.step
+
+    _validate_domain(x0, x_end)
+
+    f, analytic_fn, analytic_expr_str = _prepare_equation(
+        req.equation, req.initial_condition
+    )
+
+    # Si es custom y piden contra_analitica → error
+    if req.equation.type == "custom" and req.comparison_mode == "contra_analitica":
+        raise HTTPException(
+            status_code=400,
+            detail="comparison_mode='contra_analitica' solo está soportado para ecuaciones predefinidas por ahora.",
+        )
 
     methods_results: List[MethodResult] = []
 
@@ -82,15 +266,8 @@ def solve_and_compare(req: SolveRequest) -> SolveResponse:
         )
 
     num_points = len(methods_results[0].points) if methods_results else 0
-    problem_summary = ProblemSummary(
-        equation_type=req.equation.type,
-        equation_id=req.equation.id,
-        expression=req.equation.expression,
-        x0=x0,
-        y0=y0,
-        x_end=x_end,
-        step=h,
-        num_points=num_points,
+    summary = _build_problem_summary(
+        req.equation, req.initial_condition, req.domain, req.step, num_points
     )
 
     analytic_solution: Optional[AnalyticSolution] = None
@@ -153,8 +330,8 @@ def solve_and_compare(req: SolveRequest) -> SolveResponse:
             best_method_reason=best_reason,
         )
 
-    return SolveResponse(
-        problem_summary=problem_summary,
+    return CompareResponse(
+        problem_summary=summary,
         methods_results=methods_results,
         analytic_solution=analytic_solution,
         error_metrics=error_metrics,
