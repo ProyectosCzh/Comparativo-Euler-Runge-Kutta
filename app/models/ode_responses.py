@@ -20,14 +20,13 @@ class RK4Response(BaseModel):
         description="Metadatos (ej: orden de convergencia)."
     )
 
-
 class AnalyticResponse(BaseModel):
     grid: List[float] = Field(..., description="Puntos de tiempo t_n.")
     exact: Optional[List[float]] = Field(
         None,
         description="Valores de la solución analítica y_exact(t_n). Puede ser null si no se pudo resolver."
     )
-    meta: Dict[str, Optional[str]] = Field(
+    meta: Dict[str, Any] = Field(
         ...,
         description="Información simbólica y estado de la solución analítica."
     )
@@ -45,7 +44,11 @@ class ErrorAnalysisResponse(BaseModel):
         ...,
         description="Errores absolutos por método (euler, rk4)."
     )
-    meta: Dict[str, Optional[str]] = Field(
+    error_metrics: Dict[str, Optional[Dict[str, Optional[float]]]] = Field(
+        ...,
+        description="Métricas resumen de error por método: max y rmse."
+    )
+    meta: Dict[str, Any] = Field(
         ...,
         description="Información adicional: latex, estado de la solución, orden de métodos, etc."
     )
