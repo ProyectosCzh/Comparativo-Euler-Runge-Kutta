@@ -17,7 +17,7 @@ class ODEBaseRequest(BaseModel):
     h: float = Field(..., gt=0, description="Paso de integración (tamaño de paso).")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "f": "t*y + 2",
                 "t0": 0.0,

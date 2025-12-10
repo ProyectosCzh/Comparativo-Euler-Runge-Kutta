@@ -1,6 +1,6 @@
 # app/models/ode_responses.py
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any
 
 
 class EulerResponse(BaseModel):
