@@ -1,12 +1,13 @@
 # app/api/v1/routes_errors.py
 from fastapi import APIRouter, HTTPException
-from models.ode_requests import ErrorAnalysisRequest
-from models.ode_responses import ErrorAnalysisResponse
-from core.parser import parse_rhs
-from services.euler_solver import euler_solver
-from services.rk4_solver import rk4_solver
-from services.analytic_solver import analytic_solver
-from services.error_metrics import absolute_errors
+from app.models.ode_requests import ErrorAnalysisRequest
+from app.models.ode_responses import ErrorAnalysisResponse
+from app.core.parser import parse_rhs
+from app.services.euler_solver import euler_solver
+from app.services.rk4_solver import rk4_solver
+from app.services.analytic_solver import analytic_solver
+from app.services.error_metrics import absolute_errors
+
 
 router = APIRouter()
 

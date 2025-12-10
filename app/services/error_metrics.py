@@ -1,5 +1,7 @@
 # app/services/error_metrics.py
 from typing import List, Optional, Dict
+# euler_solver.py / rk4_solver.py
+from app.core.grid import build_time_grid
 
 
 def absolute_errors(

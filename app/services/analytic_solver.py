@@ -1,7 +1,7 @@
 # app/services/analytic_solver.py
 from typing import List, Optional, Tuple
 import sympy as sp
-from core.grid import build_time_grid
+from app.core.grid import build_time_grid
 
 
 def analytic_solver(
@@ -11,6 +11,7 @@ def analytic_solver(
     T: float,
     h: float
 ) -> Tuple[List[float], Optional[List[float]], dict]:
+
     """
     Intenta resolver analíticamente la EDO:
         y'(t) = f_sym(t, y(t))

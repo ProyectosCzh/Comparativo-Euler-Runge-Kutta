@@ -1,64 +1,34 @@
-# ==========================================
-#  Python
-# ==========================================
+# Byte-compiled / cache
 __pycache__/
 *.py[cod]
-*.pyo
-*.pyd
+*$py.class
 
-# Carpetas de entornos virtuales
-venv/
-.env/
+# Virtual environments
 .venv/
+venv/
 env/
-ENV/
 
-# Archivos generados por herramientas
-*.log
-*.tmp
-*.temp
-
-# Archivos de configuración locales
-*.env
-*.env.*
-.envrc
-
-# Paquetes / distribuciones
+# Distribution / packaging
 build/
 dist/
 *.egg-info/
-*.egg
+.eggs/
 
-# Cache de pip
-pip-wheel-metadata/
-pip-wheel-cache/
+# Logs
+*.log
 
-# Jupyter
-.ipynb_checkpoints/
-
-# VSCode
+# IDE / Editor
 .vscode/
-.history/
+.idea/
 *.code-workspace
 
-# PyCharm / JetBrains
-.idea/
+# mypy / pytest / coverage
+.mypy_cache/
+.pytest_cache/
+htmlcov/
+.coverage
+*.cover
 
-# OS specifics
-# macOS
+# OS
 .DS_Store
-.AppleDouble
-.LSOverride
-
-# Windows
 Thumbs.db
-Desktop.ini
-
-# Linux
-*~
-
-# ==========================================
-#  Tu estructura del proyecto
-#  (no hace falta ignorar nada extra)
-# ==========================================
-# app/  (se rastrea normalmente)

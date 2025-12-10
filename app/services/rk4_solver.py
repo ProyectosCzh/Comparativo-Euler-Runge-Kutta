@@ -1,6 +1,7 @@
 # app/services/rk4_solver.py
-from typing import List, Callable
-from core.grid import build_time_grid
+from typing import List, Callable, Tuple
+from app.core.grid import build_time_grid
+
 
 
 def rk4_solver(
@@ -9,7 +10,7 @@ def rk4_solver(
     y0: float,
     T: float,
     h: float
-) -> (List[float], List[float]):
+) -> Tuple[List[float], List[float]]:
     """
     Resuelve y' = f(t, y) con el método clásico de Runge-Kutta de orden 4 (RK4).
     Devuelve:
