@@ -35,6 +35,14 @@ def parse_rhs(expr_str: str) -> Tuple[sp.Expr, Callable[[float, float], float]]:
     try:
         f_sym = sp.sympify(expr_str, locals=local_dict)
     except Exception as e:
+        # Error más descriptivo
+        error_msg = str(e)
+        if "could not parse" in error_msg.lower():
+            raise ValueError(
+                f"Sintaxis inválida en la ecuación. "
+                f"Asegúrate de usar '*' para multiplicación y que las variables sean 't' y 'y'. "
+                f"Expresión recibida: '{expr_str}'. Error: {error_msg}"
+            )
         raise ValueError(f"No se pudo interpretar la expresión f(t, y): {e}")
 
     # Verificación básica: que dependa de t y/o y

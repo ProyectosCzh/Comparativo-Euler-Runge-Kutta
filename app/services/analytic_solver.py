@@ -63,8 +63,11 @@ def analytic_solver(
     for ti in grid:
         try:
             val = float(y_exact_num(ti))
+            # Verificar que el valor sea finito (no inf, -inf, nan)
+            if not (val == val and abs(val) != float('inf')):  # Chequeo de NaN e Inf
+                val = None
         except Exception:
-            val = float("nan")
+            val = None
         exact_values.append(val)
 
     return grid, exact_values, meta

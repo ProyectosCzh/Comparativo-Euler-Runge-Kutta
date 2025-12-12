@@ -22,9 +22,9 @@ class RK4Response(BaseModel):
 
 class AnalyticResponse(BaseModel):
     grid: List[float] = Field(..., description="Puntos de tiempo t_n.")
-    exact: Optional[List[float]] = Field(
+    exact: Optional[List[Optional[float]]] = Field(
         None,
-        description="Valores de la solución analítica y_exact(t_n). Puede ser null si no se pudo resolver."
+        description="Valores de la solución analítica y_exact(t_n). Puede ser null si no se pudo resolver. Los valores individuales pueden ser null si son infinitos o NaN."
     )
     meta: Dict[str, Any] = Field(
         ...,
