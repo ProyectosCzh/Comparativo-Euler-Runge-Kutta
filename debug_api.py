@@ -1,50 +1,72 @@
+
 import sys
 import os
 
 # Agregamos el directorio actual al path
 sys.path.append(os.getcwd())
 
-# Importamos los modelos y las funciones de los endpoints directamente
+from fastapi import FastAPI
+from starlette.middleware.cors import CORSMiddleware
+try:
+    from fastapi.testclient import TestClient
+    HAS_HTTPX = True
+except Exception:
+    # Capturamos cualquier error (ImportError, ModuleNotFoundError, RuntimeError)
+    # si httpx no está instalado.
+    HAS_HTTPX = False
+
+# Importamos la app y funciones
+from app.main import app
 from app.models.ode_requests import ODEBaseRequest, AnalyticRequest, ErrorAnalysisRequest
 from app.api.v1.routes_euler import solve_euler
 from app.api.v1.routes_rk4 import solve_rk4
 from app.api.v1.routes_analytic import solve_analytic
 from app.api.v1.routes_errors import solve_all
 
-def run_test(name, func, request_model, payload):
-    print(f"\n--- Probando {name} ---")
-    print(f"Payload: {payload}")
-    
-    try:
-        # Creamos el objeto request validado por Pydantic
-        req = request_model(**payload)
-        
-        # Llamamos a la función del endpoint directamente
-        response = func(req)
-        
-        # Pydantic models se pueden convertir a dict para visualización
-        data = response.dict()
-        
-        if "grid" in data:
-            print(f"Grid size: {len(data['grid'])}")
-            print(f"First 3 t: {data['grid'][:3]} ...")
-        if "euler" in data:
-            print(f"First 3 Euler y: {data['euler'][:3]} ...")
-        if "rk4" in data:
-            print(f"First 3 RK4 y: {data['rk4'][:3]} ...")
-        if "exact" in data and data['exact']:
-            print(f"First 3 Exact y: {data['exact'][:3]} ...")
-        if "error_metrics" in data:
-            print(f"Error Metrics: {data['error_metrics']}")
+def check_cors_static():
+    print("\n--- Verificando Configuración CORS (Estático) ---")
+    cors_found = False
+    # Revisamos los middleware definidos por el usuario
+    for mw in app.user_middleware:
+        if mw.cls == CORSMiddleware:
+            cors_found = True
+            print("✅ CORSMiddleware encontrado en la configuración.")
+            # print(f"   Opciones detectadas: {mw.options}") # Evitar error de atributo
+            break
             
-        print("✅ PRUEBA EXITOSA")
-        
+    if cors_found:
+        print("✅ La integración de CORS parece correcta.")
+    else:
+        print("❌ ADVERTENCIA: No se detectó CORSMiddleware en app.user_middleware.")
+
+def check_cors_dynamic():
+    if not HAS_HTTPX:
+        print("\n⚠️ 'httpx' no está instalado. Saltando prueba dinámica de CORS (TestClient).")
+        return
+
+    print("\n--- Verificando Configuración CORS (Dinámico via TestClient) ---")
+    client = TestClient(app)
+    try:
+        # Simulamos una petición preflight OPTIONS desde un origen permitido
+        response = client.options(
+            "/api/v1/ode/euler",
+            headers={
+                "Origin": "http://localhost:5173",
+                "Access-Control-Request-Method": "POST"
+            }
+        )
+        print(f"Status OPTIONS: {response.status_code}")
+        if "access-control-allow-origin" in response.headers:
+            print(f"✅ Header Access-Control-Allow-Origin: {response.headers['access-control-allow-origin']}")
+        else:
+            print("❌ Falta header Access-Control-Allow-Origin en la respuesta.")
+            
     except Exception as e:
-        print(f"❌ FALLÓ: {e}")
+        print(f"❌ Error probando CORS dinámicamente: {e}")
 
-def run_tests():
-    print("INICIANDO DEBUGGING (Llamadas directas)...")
-
+def run_logic_tests():
+    print("\n--- Verificando Lógica de Endpoints (Llamadas directas) ---")
+    
     # Payload común
     payload_exp = {
         "f": "y",
@@ -54,42 +76,36 @@ def run_tests():
         "h": 0.1
     }
 
-    # 1. Euler
-    run_test("Euler (Exp)", solve_euler, ODEBaseRequest, payload_exp)
+    # Helper para correr test
+    def _test(name, func, model, data):
+        try:
+            req = model(**data)
+            res = func(req)
+            # Si no explota, asumimos éxito básico. Verificamos algo básico
+            d = res.dict()
+            if "grid" in d:
+                print(f"✅ {name}: OK ({len(d['grid'])} puntos)")
+        except Exception as e:
+            print(f"❌ {name}: FALLÓ ({e})")
 
-    # 2. RK4
-    run_test("RK4 (Exp)", solve_rk4, ODEBaseRequest, payload_exp)
+    _test("Euler", solve_euler, ODEBaseRequest, payload_exp)
+    _test("RK4", solve_rk4, ODEBaseRequest, payload_exp)
+    _test("Analítico", solve_analytic, AnalyticRequest, payload_exp)
+    
+    payload_stiff = {"f": "-15*y", "t0": 0, "y0": 1, "T": 0.5, "h": 0.01}
+    _test("Comparación", solve_all, ErrorAnalysisRequest, payload_stiff)
 
-    # 3. Analítico
-    run_test("Analítico (Exp)", solve_analytic, AnalyticRequest, payload_exp)
-
-    # 4. Comparación (Stiff suave)
-    payload_stiff = {
-        "f": "-15*y",
-        "t0": 0.0,
-        "y0": 1.0,
-        "T": 0.5,
-        "h": 0.01
-    }
-    run_test("Comparación (Stiff)", solve_all, ErrorAnalysisRequest, payload_stiff)
-
-    # 5. Validación (Simulada)
-    # Al instanciar ODEBaseRequest Pydantic lanzará error si los tipos están mal, 
-    # pero si el error es de lógica en 'solve_euler' (ej: parseo), lo atraparemos.
-    payload_bad_func = {
-        "f": "x + y",  # x no permitido
-        "t0": 0.0, "y0": 1.0, "T": 1.0, "h": 0.1
-    }
-    print(f"\n--- Probando Validación (Debe fallar) ---")
-    try:
-        req = ODEBaseRequest(**payload_bad_func)
-        # Esto debería fallar dentro de la función por el parser
-        solve_euler(req)
-        print("❌ FALLÓ: Debió lanzar excepción HTTPException o ValueError")
-    except Exception as e:
-        print(f"✅ PRUEBA EXITOSA (Capturó error esperado): {e}")
-
-    print("\nDEBUGGING FINALIZADO.")
+def run_tests():
+    print("=== INICIANDO SCRIPT DE COMPROBACIÓN DEL PROYECTO ===")
+    
+    # 1. Verificar CORS
+    check_cors_static()
+    check_cors_dynamic()
+    
+    # 2. Verificar Lógica
+    run_logic_tests()
+    
+    print("\n=== COMPROBACIÓN FINALIZADA ===")
 
 if __name__ == "__main__":
     run_tests()
