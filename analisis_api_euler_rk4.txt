@@ -1,0 +1,82 @@
+
+REPORTE DE CAPACIDADES Y GUIA DE PRUEBAS - API EULER/RK4
+========================================================
+Fecha: 11/12/2025
+Estado: LISTO PARA FRONTEND
+
+1. CAPACIDADES DEL SISTEMA (BACKEND API)
+----------------------------------------
+El backend desarrollado con FastAPI proporciona un motor matemático robusto y seguro para la resolución numérica de Ecuaciones Diferenciales Ordinarias (EDO) de primer orden.
+
+A. MÉTODOS DE RESOLUCIÓN
+   - Método de Euler: Solución numérica rápida de primer orden. Ideal para demostrar convergencia básica.
+   - Runge-Kutta 4 (RK4): Solución numérica de alta precisión (cuarto orden). Estándar industrial para EDOs no rígidas.
+   - Solución Analítica (Simbólica): Capacidad de resolver la ecuación exactamente usando álgebra computacional (SymPy). Permite comparar la aproximación numérica contra la realidad matemática.
+
+B. ANÁLISIS DE ERRORES
+   - Comparación Automática: Endpoint unificado que ejecuta Euler, RK4 y Analítico simultáneamente.
+   - Métricas de Precisión: Calcula automáticamente:
+     - Error Absoluto Máximo (Max Error).
+     - Raíz del Error Cuadrático Medio (RMSE).
+     - Errores punto a punto para gráficas de desviación.
+
+C. SEGURIDAD Y ROBUSTEZ (Validado)
+   - Validación de Entradas: Rechaza tipos de datos incorrectos y parámetros físicos imposibles (ej: paso h negativo).
+   - Parser Seguro: Intérprete de expresiones matemáticas restringido. Previene inyección de código arbitrario limitando el scope a variables ('t', 'y') y funciones matemáticas estándar.
+   - Manejo de Excepciones: Respuestas HTTP 422 (Entidad Improcesable) para ecuaciones mal formadas y 500 (Server Error) controlado para fallos internos, evitando caídas del servicio.
+
+D. INTEGRACIÓN (Frontend Ready)
+   - CORS Habilitado: Configurado para aceptar peticiones desde `http://localhost:5173` (Vite Default) y otros orígenes de desarrollo.
+   - JSON REST API: Estructura de request/response estandarizada y tipada, lista para ser consumida por React/TypeScript.
+
+2. EJEMPLOS DE EDOS PARA PRUEBAS (TEST CASES)
+---------------------------------------------
+A continuación, se listan ecuaciones diferenciales probadas para verificar distintos comportamientos del solver.
+
+CASO 1: Crecimiento Exponencial (Básico)
+----------------------------------------
+Objetivo: Verificar corrección básica.
+- Ecuación: y' = y
+- Inicial: y(0) = 1
+- Solución Exacta: y(t) = e^t
+- Comportamiento: Euler subestima ligeramente, RK4 es casi exacto.
+
+CASO 2: Decaimiento Logístico (No Lineal)
+-----------------------------------------
+Objetivo: Probar términos no lineales (y^2).
+- Ecuación: y' = y * (1 - y)
+- Inicial: y(0) = 0.5
+- Solución Exacta: Sigmoide logística. Converge a 1.
+- Comportamiento: Curva en forma de S.
+
+CASO 3: Función Trigonométrica (Oscilatoria)
+--------------------------------------------
+Objetivo: Probar funciones trascendentes (sin, cos).
+- Ecuación: y' = cos(t)
+- Inicial: y(0) = 0
+- Solución Exacta: y(t) = sin(t)
+- Comportamiento: Oscilación pura entre -1 y 1.
+
+CASO 4: Ecuación "Stiff" (Rígida) Suave
+---------------------------------------
+Objetivo: Probar estabilidad numérica.
+- Ecuación: y' = -15*y
+- Inicial: y(0) = 1
+- Paso recomendado (h):
+    - h=0.01 -> Estable (Euler y RK4 convergen).
+    - h=0.15 -> Inestable para Euler (oscilaciones espurias), estable para RK4.
+- Comportamiento: Decaimiento rápido a 0.
+
+CASO 5: Ecuación con Singularidad (Borde)
+-----------------------------------------
+Objetivo: Probar manejo de divisiones o dominios peligrosos.
+- Ecuación: y' = 1/t  (Iniciando en t0 > 0)
+- Inicial: y(1) = 0, t0 = 1
+- Solución Exacta: y(t) = ln(t)
+- Nota: NO iniciar en t=0 (división por cero).
+
+3. RECOMENDACIONES PARA EL FRONTEND
+-----------------------------------
+- Enviar siempre `h` (paso) pequeño para gráficas suaves (ej: 0.01 a 0.1).
+- Manejar respuestas de error HTTP 422 mostrando mensajes amigables al usuario ("Fórmula inválida").
+- Graficar las 3 series de datos (Euler, RK4, Exacta) en el mismo chart para comparativa visual.
