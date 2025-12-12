@@ -1,0 +1,119 @@
+
+GUIA DE INTEGRACIÓN FRONTEND (REACT) - API EDO
+==============================================
+Fecha: 11/12/2025
+Autor: Assistent AI
+
+1. FORMATOS DE INTERCAMBIO DE DATOS (JSON)
+------------------------------------------
+La API utiliza JSON estricto para todas las comunicaciones. Los tipos de datos están validados por Pydantic.
+
+A. REQUEST (Entrada)
+--------------------
+Endpoint principal recomendado: `POST /api/v1/ode/solve`
+Este endpoint realiza todo el trabajo (Euler, RK4, Analítico, Comparación) en una sola llamada, ideal para evitar múltiples requests desde el frontend.
+
+Estructura del Cuerpo (Body):
+{
+  "f": string,   // La función f(t,y). Ej: "y - t^2 + 1" o "cos(t)"
+  "t0": float,   // Tiempo inicial
+  "y0": float,   // Condición inicial y(t0)
+  "T": float,    // Tiempo final
+  "h": float     // Paso de integración (step size)
+}
+
+Notas importantes para el Frontend:
+- `f`: Debe ser una cadena compatible con sintaxis Python/Sympy. El frontend puede pre-validar o sanitizar, pero la API tiene su propio validador seguro.
+- `h`: Si es muy pequeño (< 0.0001), la respuesta puede ser enorme (muchos puntos). Si es muy grande, la gráfica será angulosa. Recomendado: slider entre 0.01 y 0.5.
+
+B. RESPONSE (Salida)
+--------------------
+Estructura de la Respuesta Exitosa (200 OK):
+{
+  "grid": [t0, t1, t2, ...],        // Array de floats (Eje X)
+  "euler": [y0, y1, y2, ...],       // Array de floats (Serie Euler)
+  "rk4": [y0, y1, y2, ...],         // Array de floats (Serie RK4)
+  "exact": [y0, y1, ... ] | null,   // Array de floats (Serie Exacta) o null si no se pudo resolver
+  "errors": {
+      "euler": [e0, e1, ...],       // Error absoluto punto a punto
+      "rk4": [e0, e1, ...]
+  },
+  "error_metrics": {                // Resumen para tablas/tarjetas
+      "euler": { "max": float, "rmse": float },
+      "rk4": { "max": float, "rmse": float }
+  },
+  "meta": {
+      "exact_solution_latex": string | null,  // Fórmula en LaTeX para renderizar con KaTeX
+      "analytic_status": "ok" | "failed"      // Estado del solver simbólico
+  }
+}
+
+2. ESTRATEGIA DE CONEXIÓN IDEAL (REACT + TYPESCRIPT)
+----------------------------------------------------
+
+A. CAPA DE SERVICIO (API CLIENT)
+--------------------------------
+Se recomienda usar `axios` o `fetch` tipado. Crear una interfaz TypeScript que refleje la respuesta arriba descrita.
+
+```typescript
+// types.ts
+export interface OdeResponse {
+  grid: number[];
+  euler: number[];
+  rk4: number[];
+  exact: number[] | null;
+  meta: {
+    exact_solution_latex: string | null;
+  };
+  // ... resto de campos
+}
+```
+
+B. GESTIÓN DE ESTADO ASÍNCRONO
+------------------------------
+Utilizar **TanStack Query (React Query)** es altamente recomendado para:
+- Manejar estados de carga (`isLoading`).
+- Gestionar errores (`isError`).
+- Evitar race conditions si el usuario hace clic en "Calcular" múltiples veces rápidamente.
+
+C. VISUALIZACIÓN (GRÁFICAS)
+---------------------------
+La respuesta devuelve arrays paralelos (`grid` vs `euler`, etc.).
+Para librerías como **Recharts** o **Chart.js**, suele ser necesario "zipear" estos arrays en un formato de objetos:
+
+```javascript
+// Transformación típica para Recharts
+const chartData = response.data.grid.map((t, i) => ({
+  t: t,
+  euler: response.data.euler[i],
+  rk4: response.data.rk4[i],
+  exact: response.data.exact ? response.data.exact[i] : null
+}));
+```
+
+D. RENDERIZADO MATEMÁTICO
+-------------------------
+El campo `meta.exact_solution_latex` contiene la fórmula de la solución (ej: `e^t`).
+Utilizar la librería de componentes **`react-katex`** para mostrar esta fórmula de manera elegante en la UI.
+
+E. MANEJO DE ERRORES (UX)
+-------------------------
+Si la API devuelve 422 (Unprocessable Entity), suele ser porque la función `f` tiene errores de sintaxis (ej: "yy" en lugar de "y*y" o variables no permitidas).
+- Capturar el error 422.
+- Extraer `detail` del JSON de error.
+- Mostrarlo en un componente `Alert` o `Toast` para informar al usuario ("Error en la fórmula, verifique la sintaxis").
+
+3. RESUMEN DE FLUJO PROPUESTO
+-----------------------------
+1. [User Input] Escribe "y - t" en input y ajusta sliders -> State React.
+2. [Action] Click "Resolver".
+3. [Service] POST a `/api/v1/ode/solve`.
+4. [Loading] Frontend muestra spinner.
+5. [Response] Backend devuelve JSON gigante con series de tiempo.
+6. [Transform] Frontend mapea arrays a objetos {t, y_euler, y_rk4}.
+7. [Render]
+   - Gráfico de Líneas: Eje X = t, Líneas = Euler (Azul), RK4 (Rojo), Exacta (Verde Punteada).
+   - Tabla de Métricas: Muestra RMSE y Max Error.
+   - Ecuación: Renderiza LaTeX si existe.
+
+Esta arquitectura desacopla completamente el cálculo (Python/Backend) de la presentación (React/Frontend), aprovechando las fortalezas de cada uno.
