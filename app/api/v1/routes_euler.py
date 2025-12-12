@@ -1,9 +1,9 @@
 # app/api/v1/routes_euler.py
 from fastapi import APIRouter, HTTPException
-from models.ode_requests import ODEBaseRequest
-from models.ode_responses import EulerResponse
-from core.parser import parse_rhs
-from services.euler_solver import euler_solver
+from app.models.ode_requests import ODEBaseRequest
+from app.models.ode_responses import EulerResponse
+from app.core.parser import parse_rhs
+from app.services.euler_solver import euler_solver
 
 router = APIRouter()
 

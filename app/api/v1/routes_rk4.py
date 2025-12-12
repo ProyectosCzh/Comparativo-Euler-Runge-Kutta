@@ -1,9 +1,10 @@
 # app/api/v1/routes_rk4.py
 from fastapi import APIRouter, HTTPException
-from models.ode_requests import ODEBaseRequest
-from models.ode_responses import RK4Response
-from core.parser import parse_rhs
-from services.rk4_solver import rk4_solver
+from app.models.ode_requests import ODEBaseRequest
+from app.models.ode_responses import RK4Response
+from app.core.parser import parse_rhs
+from app.services.rk4_solver import rk4_solver
+
 
 router = APIRouter()
 

@@ -1,6 +1,7 @@
 # app/services/euler_solver.py
-from typing import List, Callable
-from core.grid import build_time_grid
+from typing import List, Callable, Tuple
+from app.core.grid import build_time_grid
+
 
 
 def euler_solver(
@@ -9,7 +10,7 @@ def euler_solver(
     y0: float,
     T: float,
     h: float
-) -> (List[float], List[float]):
+) -> Tuple[List[float], List[float]]:
     """
     Resuelve y' = f(t, y) con método de Euler explícito.
     Devuelve:

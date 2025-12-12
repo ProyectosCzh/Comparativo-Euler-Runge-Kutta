@@ -1,32 +1,23 @@
 # app/api/v1/routes_errors.py
 from fastapi import APIRouter, HTTPException
-from models.ode_requests import ErrorAnalysisRequest
-from models.ode_responses import ErrorAnalysisResponse
-from core.parser import parse_rhs
-from services.euler_solver import euler_solver
-from services.rk4_solver import rk4_solver
-from services.analytic_solver import analytic_solver
-from services.error_metrics import absolute_errors
+from app.models.ode_requests import ErrorAnalysisRequest
+from app.models.ode_responses import ErrorAnalysisResponse
+from app.core.parser import parse_rhs
+from app.services.euler_solver import euler_solver
+from app.services.rk4_solver import rk4_solver
+from app.services.analytic_solver import analytic_solver
+from app.services.error_metrics import absolute_errors, summary_error_metrics
 
 router = APIRouter()
 
 
-@router.post(
-    "/errors",
-    response_model=ErrorAnalysisResponse,
-    summary="Comparar métodos y calcular errores",
-    description=(
-        "Calcula la solución aproximada por Euler y RK4, intenta obtener la solución analítica "
-        "y devuelve los errores absolutos |y_num - y_exact| cuando la solución analítica está disponible."
-    ),
-)
-def compare_methods_and_errors(request: ErrorAnalysisRequest):
+def _run_full_solve(request: ErrorAnalysisRequest) -> ErrorAnalysisResponse:
     """
-    Endpoint que centraliza:
-      - Euler
-      - RK4
-      - Analítico (si SymPy puede)
-      - Errores absolutos por método
+    Lógica central que:
+      - Ejecuta Euler
+      - Ejecuta RK4
+      - Intenta resolver analíticamente
+      - Calcula errores y métricas
     """
     try:
         f_sym, f_num = parse_rhs(request.f)
@@ -34,7 +25,7 @@ def compare_methods_and_errors(request: ErrorAnalysisRequest):
         # Euler
         grid_e, y_euler = euler_solver(f_num, request.t0, request.y0, request.T, request.h)
 
-        # RK4 (usamos mismo grid, por construcción de build_time_grid)
+        # RK4 (mismo grid por construcción)
         grid_rk, y_rk4 = rk4_solver(f_num, request.t0, request.y0, request.T, request.h)
 
         if len(grid_e) != len(grid_rk):
@@ -48,12 +39,19 @@ def compare_methods_and_errors(request: ErrorAnalysisRequest):
         if len(grid_e) != len(grid_a):
             raise RuntimeError("El grid analítico no coincide con los numéricos, revise build_time_grid.")
 
-        # Errores
+        # Errores punto a punto
         errors_euler = absolute_errors(y_euler, exact_values)
         errors_rk4 = absolute_errors(y_rk4, exact_values)
 
+        # Métricas resumen
+        metrics_euler = summary_error_metrics(y_euler, exact_values)
+        metrics_rk4 = summary_error_metrics(y_rk4, exact_values)
+
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
+    except HTTPException:
+        # Lo relanzamos tal cual
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error interno en comparación: {e}")
 
@@ -74,5 +72,35 @@ def compare_methods_and_errors(request: ErrorAnalysisRequest):
             "euler": errors_euler,
             "rk4": errors_rk4
         },
+        error_metrics={
+            "euler": metrics_euler,
+            "rk4": metrics_rk4
+        },
         meta=meta
     )
+
+
+@router.post(
+    "/errors",
+    response_model=ErrorAnalysisResponse,
+    summary="Comparar métodos y calcular errores",
+    description=(
+        "Calcula la solución aproximada por Euler y RK4, intenta obtener la solución analítica "
+        "y devuelve los errores absolutos |y_num - y_exact| y métricas de error (máximo y RMSE)."
+    ),
+)
+def compare_methods_and_errors(request: ErrorAnalysisRequest):
+    return _run_full_solve(request)
+
+
+@router.post(
+    "/solve",
+    response_model=ErrorAnalysisResponse,
+    summary="Resolver EDO y obtener comparación completa (endpoint único)",
+    description=(
+        "Endpoint único pensado para el frontend: ejecuta Euler, RK4, intenta resolver analíticamente "
+        "y devuelve soluciones, errores y métricas resumen en una sola respuesta."
+    ),
+)
+def solve_all(request: ErrorAnalysisRequest):
+    return _run_full_solve(request)

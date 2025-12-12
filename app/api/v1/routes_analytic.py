@@ -1,9 +1,10 @@
 # app/api/v1/routes_analytic.py
 from fastapi import APIRouter, HTTPException
-from models.ode_requests import AnalyticRequest
-from models.ode_responses import AnalyticResponse
-from core.parser import parse_rhs
-from services.analytic_solver import analytic_solver
+from app.models.ode_requests import AnalyticRequest
+from app.models.ode_responses import AnalyticResponse
+from app.core.parser import parse_rhs
+from app.services.analytic_solver import analytic_solver
+
 
 router = APIRouter()
 

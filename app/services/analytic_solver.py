@@ -1,7 +1,7 @@
 # app/services/analytic_solver.py
 from typing import List, Optional, Tuple
 import sympy as sp
-from core.grid import build_time_grid
+from app.core.grid import build_time_grid
 
 
 def analytic_solver(
@@ -11,6 +11,7 @@ def analytic_solver(
     T: float,
     h: float
 ) -> Tuple[List[float], Optional[List[float]], dict]:
+
     """
     Intenta resolver analíticamente la EDO:
         y'(t) = f_sym(t, y(t))
@@ -21,10 +22,16 @@ def analytic_solver(
       - exact_values: lista de y_exact(t_n) o None si no se pudo resolver
       - meta: dict con info simbólica (ecuación, latex, estado)
     """
+
     t = sp.symbols('t')
     y = sp.Function('y')
+    # Sustituir el símbolo y por y(t) en f_sym si es necesario
+    f_sym_subs = f_sym
+    y_sym = sp.symbols('y')
+    if f_sym.has(y_sym):
+        f_sym_subs = f_sym.subs(y_sym, y(t))
 
-    ode = sp.Eq(sp.diff(y(t), t), f_sym)
+    ode = sp.Eq(sp.diff(y(t), t), f_sym_subs)
     grid = build_time_grid(t0, T, h)
 
     meta = {
